@@ -48,225 +48,148 @@ The problem that Flux advocates seem to have with Backbone is that it's more tha
 
 But everything else – the stuff that fits in where a Store belongs in Flux – is great! It has some flaws, but Backbone is still one of the best-written libraries out there. And, I would argue, is a perfect fit for Flux.
 
-## The Pattern: 
-
-1. React Components as View code:
-  1. Which accept Stores in their `props`.
-  1. And bind to the Store's events. 
-  1. And which never directly `set` or otherwise mutate the Stores. (That's against Flux!). Instead, they only `dispatch` events.
-    - (Optionally, dispatch events through `actions`).
-1. Stores as Backbone Models or Collections
-  1. Which register callbacks with the Dispatcher.
-  1. and are passed to the app as instantiated Stores
-1. and a Dispatcher.
-
-Here's that list with some quick-and-dirty examples to give you a better idea of what it looks like:
-
-1. React Components as View code:
-
-  1. Which accept Stores in their `props`:
-
-    ```js
-    TodoListComponent({todoStore: TodoStore})
-    ```
-
-  1. And bind to the Store's events:
-
-      ```js
-      TodoListComponent = React.createClass({
-        componentDidMount: function() {
-          that = this;
-          this.props.todoStore.on('add remove reset', function(){that.forceUpdate()}, this);
-        },
-        componentWillUnmount: function() {
-          // turn off all events and callbacks that have this context 
-          this.props.todoStore.off(null, null, this);
-        }
-      })
-      ```
-    - (The child `TodoItemComponent`s would likely bind to their `this.props.todoItem`'s `change` events). 
-  1. And which *never* directly `set` or otherwise mutate the Stores. (That's against Flux!). Instead, they only `dispatch` events: 
-      ```js
-      handleTodoDelete: function() {
-        TodoDispatcher.dispatch({
-          actionType: 'todo-delete',
-          todo: this.props.todoItem
-        });
-      }
-      ```
-    - (Optionally, dispatch events through `actions`):
-      ```js
-      // in actions.js
-      var TodoDispatcher = require('./dispatcher');
-      module.exports = {
-        deleteTodo: function(todoItem) {
-          // ... some stuff
-          TodoDispatcher.dispatch({
-            actionType: 'todo-delete',
-            todo: todoItem
-          });
-          // ... more stuff
-        }
-      }
-
-      // in components.js
-      var actions = require('actions');
-        
-        // ... in the Component ...
-        handleTodoDelete: function() {
-          actions.deleteTodo(this.props.todoItem);
-        }
-      ```
-1. Stores as Backbone Models or Collections
-  1. Which register callbacks with the Dispatcher: 
-
-    ```js
-    // don't access this from directly from within React. 
-    TodoItem = Backbone.Model.extend({});
-
-    TodoCollection = Backbone.Collection.extend({
-      model: TodoItem,
-      url: '/todo', // wow, just like that, my information saves to the server!
-      
-      initialize: function() {
-        this.dispatchToken = TripDispatcher.register(this.dispatchCallback)
-      },
-      dispatchCallback: function(payload){
-          that = this // man, I miss coffeescript's fat arrows!
-          switch (payload.actionType) {
-            case 'todo-delete':
-              that.remove(payload.todo)
-              break;
-          }
-      }
-    });
-    ```
-  1. and are passed to the app as instantiated Stores: 
-
-    ```js
-    TodoStore = new TodoCollection()
-    module.exports = TodoStore
-    ```
-1. and a Dispatcher: 
-
-    ```js
-    Dispatcher = require('Flux').Dispatcher
-    TodoDispatcher = new Dispatcher()
-    module.exports = TodoDispatcher
-    // that was easy!
-    ```
-
-In summary, the rules are:
+### The Backbone-Flux Pattern: 
 
 1. Stores are instantiated Backbone Models or Collections, which have registered a callback with the Dispatcher. 
-1. Components never directly modify Stores, but do bind to their events to trigger updates.
+2. Components *never* directly modify Stores (eg; no `.set()`). Instead, components dispatch Actions to the Dispatcher.
+3. Components do bind to query Stores and bind to their events to trigger updates.
+
+Let's look at each piece of that in turn: 
+
+#### 1. Stores are instantiated Backbone Models or Collections, which have registered a callback with the Dispatcher. 
+```js
+// dispatcher.js
+Dispatcher = require('Flux').Dispatcher
+
+TodoDispatcher = new Dispatcher()
+
+module.exports = TodoDispatcher;
+```
 
 ```js
-var React = require('react');
+// stores/TodoStore.js
 var Backbone = require('backbone');
-var Dispatcher = require('Flux').Dispatcher;
-
-// ------------------------------------------------------------------------
-// Dispatcher. Ordinarily, this would go in dispatcher.js
-
-TodoDispatcher = new Dispatcher();
-
-
-// ------------------------------------------------------------------------
-// Actions. Ordinarily, this would go in actions.js or an actions/ dir. 
-
-Actions = {
-  deleteTodo: function(todoItem) {
-    // ... do some stuff
-    TodoDispatcher.dispatch({
-      actionType: 'todo-delete',
-      todo: todoItem
-    });
-    // ... do more stuff
-  }
-}
-
-
-// ------------------------------------------------------------------------
-// Stores. Ordinarily, these would go under eg; stores/TodoStore.js
+var TodoDispatcher = require('../dispatcher');
 
 TodoItem = Backbone.Model.extend({});
 
 TodoCollection = Backbone.Collection.extend({
   model: TodoItem,
-  url: '/todo', // wow, just like that, my information saves to the server!
+  url: '/todo',
   
+  // we register a callback with the Dispatcher on init.
   initialize: function() {
-    // Flux! register with the Dispatcher so we can handle events.
-    this.dispatchToken = TripDispatcher.register(this.dispatchCallback)
+    this.dispatchToken = TodoDispatcher.register(this.dispatchCallback)
   },
-  dispatchCallback: function(payload){
-    that = this // man, I miss coffeescript's fat arrows!
+  dispatchCallback: function(payload) {
+    that = this; // man, I miss coffeescript's fat arrows!
     switch (payload.actionType) {
+      // remove the Model instance from the Store.
       case 'todo-delete':
         that.remove(payload.todo)
         break;
-      // ... lots of other `case`s (which is surprisingly readable)
+      // ... lots of other `case`s 
+      // (which is surprisingly readable)
     }
   }
 });
 
-// Voila, you have a Store!
+// the Store is an instantiated Collection. 
+// (if we were to only have one item, it would be an instantiated Model).
 TodoStore = new TodoCollection()
 
+module.exports = TodoStore
 
-// ------------------------------------------------------------------------
-// Views. This would normally go in app.js or components.js
+```
+
+#### 2. Components *never* directly modify Stores (eg; no `.set()`). Instead, components dispatch Actions to the Dispatcher.
+
+```js
+// actions.js
+var TodoDispatcher = require('./dispatcher')
+
+actionCreator = {
+  deleteTodo: function(todoItem) {
+    // dispatch 'todo-delete' action
+    TodoDispatcher.dispatch({
+      actionType: 'todo-delete',
+      todo: todoItem
+    });
+  },
+  // ... other actions ...
+}
+
+module.exports = actionCreator
+```
+
+```js
+// components/TodoComponent.js
+var actionCreator = require('../actions');
+var React = require('react');
 
 TodoListComponent = React.createClass({
+  // ...
+  handleTodoDelete: function() {
+    // instead of removing the todo from the TodoStore directly,
+    // we use the dispatcher. #flux
+    actionCreator.deleteTodo(this.props.todoItem)
+  },
+  // ...
+});
+
+module.exports = TodoListComponent;
+```
+
+#### 3. Components do bind to query Stores and bind to their events to trigger updates.
+
+```js
+// components/TodoComponent.js
+var React = require('react');
+// ...
+
+TodoListComponent = React.createClass({
+  // ... 
   componentDidMount: function() {
-    that = this;
     // the Component binds to the Store's events
+    that = this;
     this.props.todoStore.on('add remove reset', function(){that.forceUpdate()}, this);
   },
   componentWillUnmount: function() {
-    // turn off all events and callbacks that have this context 
+    // turn off all events and callbacks that have this context
     this.props.todoStore.off(null, null, this);
   },
-  handleTodoDelete: function() {
-    // instead of removing the todo from the TodoStore directly, 
-    // we use the dispatcher. #flux
-
-    Actions.deleteTodo(this.props.todoItem)
-    // ** OR: ** 
-    TodoDispatcher.dispatch({
-      actionType: 'todo-delete',
-      todo: this.props.todoItem
-    });
-  },
+  // ...
   render: function() {
-    return React.DOM.ul({}, 
-      this.props.todoStore.models.map(function(todoItem){
+    return React.DOM.ul({},
+      this.props.todoStore.map(function(todoItem){
         // TODO: TodoItemComponent
         return TodoItemComponent({todoItem: todoItem});
       })
-    );
+    )
   }
 });
-
-React.renderComponent(
-  TodoListComponent({todoStore: TodoStore}), 
-  document.querySelector('body')
-);
 ```
 
+You can see that all put together in the `example.js` file in this gist. 
 
 This all fits together really smoothly, in my eyes. 
 
 In fact, once I re-architected my application to use this pattern, almost all the ugly bits disappeared. It was a little miraculous: one by one, the pieces of code that had me gnashing my teeth looking for a better way were replaced by sensible flow. 
 
-Note that I didn't even need to use the `waitFor` that so many people are excited about (and seems like a neat idea). Just the general Flux architecture makes sense. I didn't really get how it was that different before using it. And the smoothness with which Backbone seems to integrate (when you use a subset of it in a careful way!) is remarkable: not once did I feel like I was fighting Backbone. 
+Note that I didn't even need to use `waitFor`; it may be *a* feature, but it's not the primary one. Just the general Flux architecture makes sense. I didn't really get how it was that different before using it. And the smoothness with which Backbone seems to integrate in this pattern is remarkable: not once did I feel like I was fighting Backbone. 
 
-(Okay, the one gripe I have is that binding and removing events isn't as pretty as it could be – I'd much rather do something like `this.binding = this.props.todoItem.on('change', function(){...})` and then `this.binding.off()`, but `this.props.todoItem.off(null, null, this)` is close enough. )
+### Syncing with a Web API
 
-I didn't mention this above, but among my favorite aspects of using Backbone for this is `sync`: Backbone is really smart about sending data to and fetching data from the server. It works with a predictable REST API in the most predictable way I could  imagine (there may be others with better imaginations). With the single `url:` attribute on a Model or Collection, and an occasional `save()`, `sync()` or `fetch()` call (within the dispatch handler, of course), I get all my basic server interaction. 
+In the original Flux diagram, you interact with the Web API through ActionCreators only. That never sat right with me; shouldn't the Store be the first to know about changes, before the server? 
 
-Since saving to (and even fetching from) the server is something that Flux says frustratingly little about, I'm very happy to have this unasked (but vital) question go answered.
+I flip that part of the diagram around: the Stores interact directly with a RESTful CRUD API through Backbone's `sync()`. This is wonderfully convenient, at least if you're working with an actual RESTful CRUD API. You can even tie into the `request` and `sync` events to easily display loading icons. 
 
-https://github.com/facebook/flux/blob/master/src/Dispatcher.js
+For less standard tasks, interacting via ActionCreators may make more sense.  I suspect Facebook doesn't do much "mere CRUD", in which case it's not surprising they do things that way. It may also be my youthful naivete that's causing me to interact with the web directly via Stores even for CRUD; I'm all ears to other explanations for the recommended Flux architecture.
 
+### Next Steps
+
+React and Flux have been criticized for not including recommendations for Routes. I'm hopeful that Backbone's Router, perhaps coupled with a Backbone-Flux `CurrentPageStore`, will provide this. 
+
+Writing the examples for this post in Javascript was a reminder of how much I appreciate Coffeescript. I've found Coffee and Backbone get on swimmingly, and I hope to write something soon on how I pair them. 
+
+Lastly, I'd love feedback on the above! Does this seem like a good pattern to you? Are there improvements or flaws you would suggest ammending?
