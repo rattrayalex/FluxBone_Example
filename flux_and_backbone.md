@@ -1,10 +1,11 @@
 # Flux and Backbone
-### How to have your cake and eat your pie, too. 
+## A Flux pattern that uses Backbone for Stores
 
-I've been following the progress of Flux, and debates surrounding its utility, with some interest. I found a lot of the original descriptions to be confusing if not merely incomplete. Having read (and re-read, and re-read) the architecture overview and a few examples, I still just wasn't sure  what Flux was all about, and what advantages it held over Backbone models. 
+I've been following the progress of Flux, and [debates](https://news.ycombinator.com/item?id=8248536) surrounding its utility, with some interest. I found a lot of the original descriptions to be confusing if not merely incomplete. Having read (and re-read, and re-read) the [architecture overview](http://facebook.github.io/react/blog/2014/05/06/flux.html) and a [few](https://github.com/facebook/flux/blob/master/src/Dispatcher.js) [examples](https://github.com/facebook/flux/blob/master/examples/flux-chat/js/stores/MessageStore.js), I still just wasn't sure  what Flux was all about, and what advantages it held over Backbone models. 
 
-In fact, early on, I asked the team what was wrong with using Backbone Collections and Models with React. At the time, I had never used Backbone or React; just read documentation for both. It seemed to me that a lot of what Flux was doing was really just reinventing the wheel that Backbone had honed. 
-When I finally dove into my first Backbone app (using React instead of Backbone Views), I started to see what the Flux crowd was talking about. The "complex event chains" that Code Experience Person talks about didn't take long to rear its head. 
+In fact, early on, [I asked the team](https://news.ycombinator.com/item?id=7721292) what was wrong with using Backbone Collections and Models with React, and wasn't satisfied with the response. At the time, I had never used Backbone; just read some documentation. 
+
+When I finally dove into my first Backbone app (using React instead of Backbone Views), I started to see what the Flux crowd was talking about. The "complex event chains" that I had [read about](http://www.code-experience.com/avoiding-event-chains-in-single-page-applications/) about didn't take long to rear its head. 
 
 Sending events from the UI to the Models, and then from one Model to another and then back again, just felt obviously wrong, especially after reading about Flux. My code, frankly, was gross. So I took another look at the mysterious "architecture-not-a-framework". 
 
@@ -46,9 +47,11 @@ Backbone's Models and Collections already have everything Flux's EventEmitter-ba
 
 The problem that Flux advocates seem to have with Backbone is that it's more than you need. They're right, of course. You don't need Backbone Views at all, and Models and Collections have a bunch of features you shouldn't use in a Flux application. 
 
-But everything else – the stuff that fits in where a Store belongs in Flux – is great! It has some flaws, but Backbone is still one of the best-written libraries out there. And, I would argue, is a perfect fit for Flux.
+But everything else – the stuff that fits in where a Store belongs in Flux – is great! It isn't perfect, but Backbone is still one of the best-written libraries out there. And, I would argue, is a perfect fit for Flux.
 
 ### The Backbone-Flux Pattern: 
+
+After some experimentation, this pattern for using Backbone Collections and Models as Flux Stores has got me excited:
 
 1. Stores are instantiated Backbone Models or Collections, which have registered a callback with the Dispatcher. 
 2. Components *never* directly modify Stores (eg; no `.set()`). Instead, components dispatch Actions to the Dispatcher.
