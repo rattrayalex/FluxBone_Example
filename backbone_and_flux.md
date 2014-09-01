@@ -13,7 +13,7 @@ At the Flux githup repo, I saw the following quote:
 
 > Flux is more of a pattern than a framework, and does not have any hard dependencies. However, we often use EventEmitter as a basis for Stores and React for our Views. The one piece of Flux not readily available elsewhere is the Dispatcher. This module is available here to complete your Flux toolbox.
 
-I love React for Views, and the Dispatcher really was something I was looking for. But using "EventEmitter" for Stores? What's that about? I took a peek into the provided examples... 
+I love React for Views, and the Dispatcher really was something I was looking for. But using "EventEmitter" for Stores? What's that about? I took a peek into the [provided examples](https://github.com/facebook/flux/blob/master/examples/flux-chat/js/stores/MessageStore.js)... 
 
 ```javascript
 var MessageStore = merge(EventEmitter.prototype, {
@@ -36,7 +36,7 @@ var MessageStore = merge(EventEmitter.prototype, {
   getAll: function() {
     return _messages;
   },
-# etc...
+// etc...
 ```
 
 Gross! I have to write all that myself, every time I want a simple Store? Which I'm supposed to sprinkle liberally everywhere?
@@ -55,7 +55,7 @@ After some experimentation, this pattern for using Backbone Collections and Mode
 
 1. Stores are instantiated Backbone Models or Collections, which have registered a callback with the Dispatcher. 
 2. Components *never* directly modify Stores (eg; no `.set()`). Instead, components dispatch Actions to the Dispatcher.
-3. Components do bind to query Stores and bind to their events to trigger updates.
+3. Components query Stores and bind to their events to trigger updates.
 
 Let's look at each piece of that in turn: 
 
@@ -143,7 +143,7 @@ TodoListComponent = React.createClass({
 module.exports = TodoListComponent;
 ```
 
-#### 3. Components do bind to query Stores and bind to their events to trigger updates.
+#### 3. Components query Stores and bind to their events to trigger updates.
 
 ```js
 // components/TodoComponent.js
