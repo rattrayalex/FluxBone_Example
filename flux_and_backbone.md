@@ -1,5 +1,5 @@
 # Flux and Backbone
-## How to have your cake and eat your pie, too. 
+### How to have your cake and eat your pie, too. 
 
 I've been following the progress of Flux, and debates surrounding its utility, with some interest. I found a lot of the original descriptions to be confusing if not merely incomplete. Having read (and re-read, and re-read) the architecture overview and a few examples, I still just wasn't sure  what Flux was all about, and what advantages it held over Backbone models. 
 
