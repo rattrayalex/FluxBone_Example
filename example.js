@@ -37,10 +37,9 @@ TodoCollection = Backbone.Collection.extend({
     this.dispatchToken = TodoDispatcher.register(this.dispatchCallback)
   },
   dispatchCallback: function(payload){
-    that = this // man, I miss coffeescript's fat arrows!
     switch (payload.actionType) {
       case 'todo-delete':
-        that.remove(payload.todo)
+        this.remove(payload.todo)
         break;
       // ... lots of other `case`s (which is surprisingly readable)
     }
@@ -56,9 +55,10 @@ TodoStore = new TodoCollection()
 
 TodoListComponent = React.createClass({
   componentDidMount: function() {
-    that = this;
     // the Component binds to the Store's events
-    this.props.todoStore.on('add remove reset', function(){that.forceUpdate()}, this);
+    this.props.todoStore.on('add remove reset', function(){
+      this.forceUpdate()
+    }.bind(this), this);
   },
   componentWillUnmount: function() {
     // turn off all events and callbacks that have this context
