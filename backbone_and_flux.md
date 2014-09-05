@@ -21,11 +21,11 @@ In general, it was very nice, and the pieces fit together okay. Here's what Back
 
 Backbone is an excellent ~little library that includes Views, Models, Collections, and Routes. React replaces Backbone's Views, and let's save Routes for another day. Models are simple places to store data and optionally sync them with the server using a typical REST API. Collections are just places to store a group of model instances. 
 
-Both Models and Collections emit helpful events. For example, a model emits `"change"` when it's been modified, a collection emits `"add"` when a new instance has been added, and they all emit `"request"` when you start to push a change to the server (done with or `.sync()`) and `"sync"` once it's gone through.
+Both Models and Collections emit helpful events. For example, a model emits `"change"` when it's been modified, a collection emits `"add"` when a new instance has been added, and they all emit `"request"` when you start to push a change to the server and `"sync"` once it's gone through.
 
-You get attributes with `my_instance.get('attribute')` and set as you would expect: `my_instance.set({'attribute': 'value'})`. 
+You get attributes with `my_instance.get('attribute')` and set with `my_instance.set({'attribute': 'value'})`. You add model instances to collection instances with: `my_list.add(my_model_instance)`.
 
-By including `model` and `url` attributes on a Collection, you get all the basic CRUD operations via a REST API for free, via `.add()`, `.fetch()`, `.save()`, and `.destroy()`. You can guess which does which. 
+By including `model` and `url` attributes on a Collection, you get all the basic CRUD operations via a REST API for free, via `.save()`, `.fetch()`, and `.destroy()`. You can guess which does which. 
 
 ... Now you know all the Backbone you need to know for Fluxbone! But just to make it concrete, here's a quick example: 
 
@@ -48,7 +48,7 @@ var TodoCollection = Backbone.Collection.extend({
 var TodoList = new TodoCollection(); // initialize() called. Let's assume no todos were returned. 
 
 var itemOne = new TodoItem({name: 'buy milk'});
-TodoList.add(itemOne); // this will send `POST /todo` to with `name=buy milk`
+TodoList.add(itemOne); // this will send `POST /todo` with `name=buy milk`
 var itemTwo = TodoList.create({name: 'take out trash'}); // same as above.
 
 TodoList.remove(itemOne); // sends `DELETE /todo/1`
