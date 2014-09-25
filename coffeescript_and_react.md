@@ -163,3 +163,53 @@ Having run `npm install reactify --save-dev`, I can also import npm modules that
 
 <<< TALK ABOUT HOW COMPONENTS MAKE BIG TEMPLATE FILES UNNECESSARY >>> 
 
+----
+
+### CoffeeScript Saves Lives
+
+Okay, that's an exaggeration. But, if you play fast and loose with philosophy, not much of one. 
+
+JavaScript and JSX waste my life away. (Melodramatic, but true). When I'm writing in them, I spend a much higher percentage of my time on keystrokes that do not add value. 
+
+When I write `var myFunc = function (arg) {};` instead of `myFunc = (arg) ->`, I am writing 14 keystrokes that I did not need to. When I write `<div></div>` instead of `div {},`, it's an extra 4 (If that was "MyComponent" instead of "div", it'd be an extra 11!). 
+
+What's 10 keystrokes in the grand scheme of things? Aren't you going a little overboard here?
+
+I don't think so. At least, not if you're an engineer. When I code, I code *a lot*. In a given week, I might spend 40 hours writing code (out of 60 hours working). Those 14 keystrokes just to define a function? That might be seven seconds. 
+
+It doesn't sound like a lot until you realize that you're defining functions (+14ks), if statements (+5ks), variables (+5ks), and inserting React components (x+1ks) *all day long*. All day long! 
+
+Let's say coding in CoffeeScript takes 25% fewer keystrokes than coding with JavaScript/JSX. (I'd love to run a benchmark but don't know how to do so objectively). If you spend 4 hours a day physically writing code, that's a whole hour you just gained. 
+
+If you're an engineer, you're spending a significant portion of *your life* coding. Why waste it on literally mindless tasks like "type out the word function and then some curly braces and then a semicolon"? 
+
+The only response I can think of to this is "it doesn't take that long to type a semicolon". Right. A piece of paper isn't that thick, but when you're Dunder Mifflin, you need a whole warehouse to deal with the total thickness of all the paper you're producing. 
+
+Of course, we also spend a lot of time reading and editing code. I personally find CoffeeScript much more readable than JavaScript+JSX. Of course, I *can* read JavaScript and JSX, without noticeable difficulty, but it does take longer. Since the eye has less to look at, it only spends time looking at meaningful code. With Javascript, you can't help looking at the boilerplate. 
+
+Editing takes much longer because I need to move *two* noncontinuous lines whenever I change the position of a code block or component (that pesky closing `}` or `</div>`). 
+
+Because of semicolons alone, you're spending an extra keystroke practically *every single line*. 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

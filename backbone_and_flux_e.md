@@ -3,16 +3,13 @@
 
 ---
 
-<!-- I've been following the progress of Flux, and [debates](https://news.ycombinator.com/item?id=8248536) surrounding its utility, with some interest. I found a lot of the original descriptions to be confusing if not merely incomplete. Having read (and re-read, and re-read) the [architecture overview](http://facebook.github.io/react/blog/2014/05/06/flux.html) and a [few](https://github.com/facebook/flux/blob/master/src/Dispatcher.js) [examples](https://github.com/facebook/flux/blob/master/examples/flux-chat/js/stores/MessageStore.js), I still just wasn't sure  what Flux was all about, and what advantages it held over Backbone models.  -->
+[React.js](http://facebook.github.io/react/) is an incredible library. Sometimes it feels like the best thing since sliced Python. When the React devs [started talking about Flux](http://facebook.github.io/react/blog/2014/05/06/flux.html), an architecture that React fits into, I was excited, but a bit befuddled. After looking through their recent [docs](https://github.com/facebook/flux) and [examples](https://github.com/facebook/flux/blob/master/examples/flux-chat/js/stores/MessageStore.js), I realized there was still something missing with Flux "Stores". FluxBone is the pattern I use that fills the gaps I found, using Backbone's Models and Collections to underlie Stores. 
 
-
-Flux and Backbone play wonderfully together. Or rather, part of Backbone does a great job serving as a part of Flux.
+The result has felt as simple and pleasant to use as React. 
 
 ### A quick overview of Backbone, and it's shortcomings
 
-\* (Actually, before *that*, I tried using Bacon.js in a [Functional Reactive Programming](https://gist.github.com/staltz/868e7e9bc2a7b8c1f754) pattern, which had me excited but left me frustrated).
-
-I started my journey* by using React with Backbone's Models and Collections, without a Flux architecture. 
+I started my journey by using React with Backbone's Models and Collections, without a Flux architecture. 
 
 In general, it was very nice, and the pieces fit together okay. Here's what Backbone does, and then what it did wrong:
 
@@ -20,11 +17,9 @@ In general, it was very nice, and the pieces fit together okay. Here's what Back
 
 (If you're already well-versed in Backbone, you can skip this - though your corrections would be valued!)
 
-Backbone is an excellent ~little library that includes Views, Models, Collections, and Routes. React replaces Backbone's Views, and let's save Routes for another day. Models are simple places to store data and optionally sync them with the server using a typical REST API. Collections are just places to store a group of model instances. 
+[Backbone](http://backbonejs.org) is an excellent ~little library that includes Views, Models, Collections, and Routes. Models are simple places to store data and optionally sync them with the server using a typical REST API. Collections are just places to store multiple model instances; think a SQL table. (React replaces Backbone's Views, and let's save Routes for another day.)
 
 Both Models and Collections emit helpful events. For example, a model emits `"change"` when it's been modified, a collection emits `"add"` when a new instance has been added, and they all emit `"request"` when you start to push a change to the server and `"sync"` once it's gone through.
-
-You get attributes with `my_instance.get('attribute')` and set with `my_instance.set({'attribute': 'value'})`. You add model instances to collection instances with: `my_list.add(my_model_instance)`.
 
 By including `model` and `url` attributes on a Collection, you get all the basic CRUD operations via a REST API for free, via `.save()`, `.fetch()`, and `.destroy()`. You can guess which does which. 
 
@@ -33,7 +28,7 @@ By including `model` and `url` attributes on a Collection, you get all the basic
 ```js
 var Backbone = require('backbone');
 
-var TodoItem = Backbone.Model.extends({
+var TodoItem = Backbone.Model.extend({
   // you don't actually need to put anything here.
   // It's that easy!
 });
@@ -50,7 +45,7 @@ var TodoList = new TodoCollection(); // initialize() called. Let's assume no tod
 
 var itemOne = new TodoItem({name: 'buy milk'});
 TodoList.add(itemOne); // this will send `POST /todo` with `name=buy milk`
-var itemTwo = TodoList.create({name: 'take out trash'}); // same as above.
+var itemTwo = TodoList.create({name: 'take out trash'}); // shortcut for above.
 
 TodoList.remove(itemOne); // sends `DELETE /todo/1`
 
@@ -75,11 +70,11 @@ Sending events from the UI to the Models, and then from one Model to another and
 
 So I took another look at the mysterious "architecture-not-a-framework". 
 
-### A less quick Overview of Flux, and it's missing piece
+### An Overview of Flux, and it's missing piece
 
 (If you're already well-versed in Flux, you can skip this - though your corrections would be valued!)
 
-Flux's slogan is "one-way data flow" (err, they say "unidirectional"). Here's what that flow looks like: 
+Flux's slogan is "unidirectional data flow". Here's what that flow looks like: 
 
 ![Flux Diagram](https://github.com/facebook/flux/raw/master/docs/img/flux-diagram-white-background.png)
 
@@ -104,7 +99,7 @@ I won't discuss React here, since so much has been written about it, other than 
 
 #### The Dispatcher
 
-The Flux Dispatcher is a single place where all events events that modify your Stores are handled. To use it, you have each Store `register` a single callback to handle all events. Then, whenever you want to modify a Store, you `dispatch` an event. 
+The Flux Dispatcher is a single place where all events that modify your Stores are handled. To use it, you have each Store `register` a single callback to handle all events. Then, whenever you want to modify a Store, you `dispatch` an event. 
 
 Like React, the Dispatcher strikes me as a Good Idea, Implemented Well. Here's a quick and dirty example: 
 
@@ -118,15 +113,13 @@ module.exports = MyDispatcher;
 // in MyStore.js
 var MyDispatcher = require('./MyDispatcher');
 
-MyStore = {}; 
+MyStore = []; 
 MyStore.dispatchCallback = function(payload) {
   switch (payload.actionType) {
     case 'add-item':
       MyStore.push(payload.item);
       break;
     case 'delete-last-item':
-      // we're not actually using this, 
-      // but it gives you an idea of what a dispatchCallback looks like.
       MyStore.pop();
       break;
   }
@@ -139,6 +132,9 @@ var MyDispatcher = require('./MyDispatcher');
 
 MyComponent = React.createClass({
   handleAddItem: function() {
+    // note: you're NOT just pushing directly to the store!
+    // (the restriction of moving through the dispatcher 
+    // makes everything much more modular and maintainable)
     MyDispatcher.dispatch({
       actionType: 'add-item',
       item: 'hello world'
@@ -159,7 +155,7 @@ This makes it really easy to answer two questions:
 1. Q: What are all the events that modify MyStore? 
   - A: You go to MyStore.dispatchCallback, and browse through the `case` statements. This is surprisingly readable.
 2. Q: What are all possible sources of that event?
-  - A: grep (or rather, use Sublime Text's find-across-files) for that actionType. 
+  - A: grep for that actionType. 
 
 This is much easier than looking for, eg; `MyModel.set` AND `MyModel.save` AND `MyCollection.add` etc. Tracking down the answers to these basic questions got really hard really fast. 
 
@@ -167,6 +163,9 @@ The Dispatcher also allows you to have callbacks run sequentially in a simple, s
 
 ```js
 // in MyMessageStore.js
+
+var MyDispatcher = require('./MyDispatcher');
+var MyStore = require('./MyStore');
 
 // this isn't actually how you're supposed to set up a store... 
 // but it gives you the right idea. 
@@ -202,7 +201,7 @@ MessageStore.dispatchCallback = function(payload) {
 
 ```
 
-In practice, I was shocked to see how much cleaner my code was when using this approach to modify my Stores (err, Models & Collections) compared with straight Backbone, even without using `waitFor`.
+In practice, I was shocked to see how much cleaner my code was when using this approach to modify my Stores (err, Models & Collections), even without using `waitFor`.
 
 #### Stores
 
@@ -210,19 +209,20 @@ So data flows *into* Stores through the Dispatcher. Got it. But how does data fl
 
 > [The] view listens for events that are broadcast by the stores that it depends on.
 
-Okay, great. Just like we registered callbacks with our Stores, we register callbacks with our Views (which are React Components). We tell React to re-`render` whenever a change occurs in the Store which was passed in through its `props`. (Or, rather, for each Store passed in).
+Okay, great. Just like we registered callbacks with our Stores, we register callbacks with our Views (which are React Components). We tell React to re-`render` whenever a change occurs in the Store which was passed in through its `props`. 
 
 For example: 
 
 ```js
 // in MyComponent.js
+var React = require('react');
 
 MyComponent = React.createClass({
   componentDidMount: function() {
     // register a callback on MyStore
     // to tell this component to forceUpdate
     // whenever it triggers a "change" event.
-    this.props.MyStore.addChangeListener(function(){
+    this.props.MyStore.addEventListener("change", function(){
       this.forceUpdate();
     }.bind(this));
   },
@@ -268,7 +268,7 @@ var MessageStore = merge(EventEmitter.prototype, {
 // etc...
 ```
 
-Gross! I have to write all that myself, every time I want a simple Store? Which I'm supposed to use every time I have a piece of information I want to display?? Do you think I have unlimited numbers of Facebook Engineers or something??!!11! (okay, I can think of *one* place that's true...) 
+Gross! I have to write all that myself, every time I want a simple Store? Which I'm supposed to use every time I have a piece of information I want to display?? Do you think I have unlimited numbers of Facebook Engineers or something? (okay, I can think of *one* place that's true...) 
 
 ### Flux Stores: the Missing Piece
 
@@ -276,7 +276,7 @@ Backbone's Models and Collections already have everything Flux's EventEmitter-ba
 
 By telling you to use raw EventEmitter, Flux is recommending that you recreate maybe 50-75% of Backbone's Models & Collections every time you create a Store. Using "EventEmitter" for your stores is like using "Node.js" for your server. Okay, I'll do that, but I'll do it through Express.js or equivalent: a well-built microframework that's taken care of all the basics and boilerplate. 
 
-Just like Express.js is built on Node.js, Backbone's Models and Collections are built on EventEmitter. And it's taken care of all the basics and boilerplate: Backbone emits `"change"` events and has query methods and getters and setters and everything. Plus, [jashkenas](https://github.com/jashkenas) and his army of [230 contributors](https://github.com/jashkenas/backbone/graphs/contributors) did a much better job on all of those things than I or you ever will.
+Just like Express.js is built on Node.js, Backbone's Models and Collections are built on EventEmitter. And it has all the stuff you pretty much always need: Backbone emits `"change"` events and has query methods and getters and setters and everything. Plus, [jashkenas](https://github.com/jashkenas) and his army of [230 contributors](https://github.com/jashkenas/backbone/graphs/contributors) did a much better job on all of those things than I or you ever will.
 
 As an example, I converted [the MessageStore example](https://github.com/facebook/flux/blob/master/examples/flux-chat/js/stores/MessageStore.js) from above to [a "FluxBone" version](#file-messagestore-fluxbone-js). (Note that it's incomplete (ie; I only converted that file) and is untested).
 
