@@ -409,6 +409,56 @@ In fact, once I re-architected my application to use this pattern, almost all th
 
 Note that I didn't even need to use `waitFor`; it may be *a* feature, but it's not the primary one. Just the general Flux architecture makes sense. I didn't really get how it was that different before using it. And the smoothness with which Backbone seems to integrate in this pattern is remarkable: not once did I feel like I was fighting Backbone, Flux, or React in order to fit them together. 
 
+### Example Mixin
+
+Writing the `this.on(...)` and `this.off(...)` code every time you add a FluxBone Store to a component can get a bit old (at least when you're spoiled enough to not have to write any EventEmitter code yourself).
+
+Here's an example React Mixin that, while extremely naiive, would certainly make iterating quickly even easier: 
+
+```js
+// in FluxBoneMixin.js
+module.exports = function(propName) {
+  return {
+    componentDidMount: function() {
+      this.props[propName].on('all', function(){
+        this.forceUpdate();
+      }.bind(this), this);
+    },
+    componentWillUnmount: function() {
+      this.props[propName].off('all', function(){
+        this.forceUpdate();
+      }.bind(this), this);
+    }
+  };
+};
+
+// in MyComponent.js
+var React = require('react');
+var FluxBoneMixin = require('./FluxBoneMixin');
+var UserStore = require('./UserStore');
+var TodoStore = require('./TodoStore');
+
+var MyComponent = React.createClass({
+  mixins: [FluxBoneMixin('UserStore'), FluxBoneMixin('TodoStore')]
+  render: function(){
+    return React.DOM.div({},
+      'Hello, ' + this.props.UserStore.get('name') +
+      ', you have ' + this.props.TodoStore.length + 
+      'things to do.'
+    )
+  }
+});
+
+React.renderComponent(
+  MyComponent({
+    MyStore: MyStore, 
+    TodoStore: TodoStore
+  }),
+  document.querySelector('body')
+);
+
+```
+
 ### Syncing with a Web API
 
 In the original Flux diagram, you interact with the Web API through ActionCreators only. That never sat right with me; shouldn't the Store be the first to know about changes, before the server? 
