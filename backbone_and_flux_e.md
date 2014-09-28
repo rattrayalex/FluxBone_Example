@@ -9,6 +9,8 @@ In short, the recommended Flux architecture makes you to do too much legwork for
 
 I have used the pattern in two projects so far, one highly standard CRUD app, and one highly irregular, frontend-only application. I hope to open-source both and link them back here as examples. 
 
+(Note: the following examples are in CoffeeScript for convenience, and can be treated as pseudocode by non-CoffeeScript developers). 
+
 ### A quick overview of Backbone, and it's shortcomings
 
 I started my journey by using React with Backbone's Models and Collections, without a Flux architecture. 
@@ -27,37 +29,37 @@ By including `model` and `url` attributes on a Collection, you get all the basic
 
 Here's a quick example: 
 
-```js
-var Backbone = require('backbone');
+```coffee
+Backbone = require("backbone")
 
-var TodoItem = Backbone.Model.extend({});
+TodoItem = Backbone.Model.extend({})
 
-var TodoCollection = Backbone.Collection.extend({
-  model: TodoItem,
-  url: '/todo',
-  initialize: function(){
-    this.fetch(); // sends `GET /todo` and populates the models if there are any. 
-  }
-});
+TodoCollection = Backbone.Collection.extend(
+  model: TodoItem
+  url: "/todo"
+  initialize: ->
+    @fetch() # sends `GET /todo` and populates the models if there are any.
+)
 
-var TodoList = new TodoCollection(); // initialize() called. Let's assume no todos were returned. 
+TodoList = new TodoCollection() # initialize() called. Let's assume no todos were returned.
 
-var itemOne = new TodoItem({name: 'buy milk'});
-TodoList.add(itemOne); // this will send `POST /todo` with `name=buy milk`
-var itemTwo = TodoList.create({name: 'take out trash'}); // shortcut for above.
+itemOne = new TodoItem(name: "buy milk")
+TodoList.add(itemOne) # this will send `POST /todo` with `name=buy milk`
 
-TodoList.remove(itemOne); // sends `DELETE /todo/1`
+itemTwo = TodoList.create({name: "take out trash"}) # shortcut for above.
 
-itemTwo.on('change', function(){
-  console.log('itemTwo was changed!');
-});
-itemTwo.on('sync', function(){
-  console.log('itemTwo synced to server!');
-});
+TodoList.remove(itemOne) # sends `DELETE /todo/1`
 
-itemTwo.destroy(); // sends `DELETE /todo/2`. 
-// > itemTwo was changed!
-// > itemTwo synced to server!
+itemTwo.on "change", ->
+  console.log "itemTwo was changed!"
+
+itemTwo.on "sync", ->
+  console.log "itemTwo synced to server!"
+
+itemTwo.destroy() # sends `DELETE /todo/2`.
+# > itemTwo was changed!
+# > itemTwo synced to server!
+
 ```
 
 
@@ -102,50 +104,53 @@ The Flux Dispatcher is a single place where all events that modify your Stores a
 
 Like React, the Dispatcher strikes me as a Good Idea, Implemented Well. Here's a quick and dirty example: 
 
-```js
+```coffee
+# in TodoDispatcher.coffee
+Dispatcher = require("flux").Dispatcher
 
-// in MyDispatcher.js
-var Dispatcher = require('flux').Dispatcher;
-var MyDispatcher = new Dispatcher(); // tah-dah! Really, that's all it takes. 
-module.exports = MyDispatcher;
+TodoDispatcher = new Dispatcher() # tah-dah! Really, that's all it takes.
 
-// in MyStore.js
-var MyDispatcher = require('./MyDispatcher');
+module.exports = TodoDispatcher
+```
 
-MyStore = []; 
-MyStore.dispatchCallback = function(payload) {
-  switch (payload.actionType) {
-    case 'add-item':
-      MyStore.push(payload.item);
-      break;
-    case 'delete-last-item':
-      MyStore.pop();
-      break;
-  }
-}
-MyStore.dispatchToken = MyDispatcher.registerCallback(MyStore.dispatchCallback);
-module.exports = MyStore;
+```coffee
+# in TodoStore.coffee
+TodoDispatcher = require("./TodoDispatcher")
 
-// in MyComponent.js
-var MyDispatcher = require('./MyDispatcher');
+# we'll do this the FluxBone way later.
+TodoStore = {items: []}
 
-MyComponent = React.createClass({
-  handleAddItem: function() {
-    // note: you're NOT just pushing directly to the store!
-    // (the restriction of moving through the dispatcher 
-    // makes everything much more modular and maintainable)
-    MyDispatcher.dispatch({
-      actionType: 'add-item',
-      item: 'hello world'
-    })
-  },
-  render: function() {
-    return React.DOM.button(
-      {onClick: this.handleAddItem}, 
-      'Add an Item!'
-    );
-  }
-});
+TodoStore.dispatchCallback = (payload) ->
+  switch payload.actionType
+    when "add-item"
+      TodoStore.items.push payload.item
+    when "delete-last-item"
+      TodoStore.items.pop()
+
+TodoStore.dispatchToken = TodoDispatcher.registerCallback(TodoStore.dispatchCallback)
+
+module.exports = TodoStore
+
+```
+
+```coffee
+# in ItemAddComponent.coffee
+TodoDispatcher = require("./TodoDispatcher")
+
+ItemAddComponent = React.createClass
+  handleAddItem: ->
+    # note: you're NOT just pushing directly to the store!
+    # (the restriction of moving through the dispatcher
+    # makes everything much more modular and maintainable)
+    TodoDispatcher.dispatch
+      actionType: "add-item"
+      item: "hello world"
+
+  render: ->
+    React.DOM.button {
+      onClick: @handleAddItem
+    },
+      "Add an Item!"
 
 ```
 
@@ -160,26 +165,23 @@ This is much easier than looking for, eg; `MyModel.set` AND `MyModel.save` AND `
 
 The Dispatcher also allows you to have callbacks run sequentially in a simple, synchronous fashion, using `waitFor`. Eg;
 
-```js
-// in MyMessageStore.js
+```coffee
+# in MessageStore.coffee
+MyDispatcher = require("./MyDispatcher")
+TodoStore = require("./TodoStore")
 
-var MyDispatcher = require('./MyDispatcher');
-var MyStore = require('./MyStore');
+# We'll see the FluxBone way later.
+MessageStore = {items: []}
 
+MessageStore.dispatchCallback = (payload) ->
+  switch payload.actionType
+    when "add-item"
+      # synchronous event flow!
+      MyDispatcher.waitFor [TodoStore.dispatchToken]
 
-// We'll see the FluxBone way later. 
-MessageStore = {items: []}; 
+      MessageStore.items.push "You added an item! It was: " + payload.item
 
-MessageStore.dispatchCallback = function(payload) {
-  switch (payload.actionType) {
-    case 'add-item': 
-
-      // synchronous event flow!
-      MyDispatcher.waitFor([MyStore.dispatchToken]);
-
-      MessageStore.items.push('You added an item! It was: ' + payload.item); 
-  }
-} 
+module.exports = MessageStore
 
 ```
 
@@ -195,28 +197,24 @@ Okay, great. Just like we registered callbacks with our Stores, we register call
 
 For example: 
 
-```js
-// in MyComponent.js
-var React = require('react');
+```coffee
+# in TodoListComponent.coffee
+React = require("react")
 
-MyComponent = React.createClass({
-  componentDidMount: function() {
-    this.props.MyStore.addEventListener("change", function(){
-      this.forceUpdate();
-    }.bind(this));
-  },
-  componentWillUnmount: function() {
-    // remove the callback
-  },
-  render: function() {
-    // show the items in a list.
-    return React.DOM.ul({}, 
-      this.props.MyStore.items.map(function(item){
-        React.DOM.li({}, item)
-      })
-    );
-  }
-});
+TodoListComponent = React.createClass
+  componentDidMount: ->
+    @props.TodoStore.addEventListener "change", =>
+      @forceUpdate()
+    , @
+
+  componentWillUnmount: ->
+    # remove the callback
+
+  render: ->
+    # show the items in a list.
+    React.DOM.ul {}, @props.TodoStore.items.map (item) ->
+      React.DOM.li {}, item
+
 ```
 
 Awesome! 
@@ -272,110 +270,105 @@ So let's use Backbone for Stores!
 Let's look at each piece of that in turn: 
 
 #### 1. Stores are instantiated Backbone Models or Collections, which have registered a callback with the Dispatcher. 
-```js
-// dispatcher.js
-Dispatcher = require('Flux').Dispatcher
 
-TodoDispatcher = new Dispatcher();  // yep, it's that easy!
+```coffee
+# in TodoDispatcher.coffee
+Dispatcher = require("flux").Dispatcher
 
-module.exports = TodoDispatcher;
+TodoDispatcher = new Dispatcher() # tah-dah! Really, that's all it takes.
+
+module.exports = TodoDispatcher
+
 ```
 
-```js
-// stores/TodoStore.js
-var Backbone = require('backbone');
-var TodoDispatcher = require('../dispatcher');
+```coffee
+# in stores/TodoStore.coffee
+Backbone = require("backbone")
+TodoDispatcher = require("../dispatcher")
 
-TodoItem = Backbone.Model.extend({});
+TodoItem = Backbone.Model.extend({})
 
-TodoCollection = Backbone.Collection.extend({
-  model: TodoItem,
-  url: '/todo',
-  
-  // we register a callback with the Dispatcher on init.
-  initialize: function() {
-    this.dispatchToken = TodoDispatcher.register(this.dispatchCallback)
-  },
-  dispatchCallback: function(payload) {
-    switch (payload.actionType) {
-      // remove the Model instance from the Store.
-      case 'todo-delete':
-        this.remove(payload.todo);
-        break;
-      case 'todo-add': 
-        this.add(payload.todo);
-        break;
-      case 'todo-update': 
-        // do stuff...
-        this.add(payload.todo, {'merge': true});
-        break;
-      // ... etc
-    }
-  }.bind(this)
-});
+TodoCollection = Backbone.Collection.extend
+  model: TodoItem
+  url: "/todo"
 
-// the Store is an instantiated Collection; a singleton.
+  # we register a callback with the Dispatcher on init.
+  initialize: ->
+    @dispatchToken = TodoDispatcher.register(@dispatchCallback)
+
+  dispatchCallback: (payload) =>
+    switch payload.actionType
+      # remove the Model instance from the Store.
+      when "todo-delete"
+        @remove payload.todo
+      when "todo-add"
+        @add payload.todo
+      when "todo-update"
+        # do stuff...
+        @add payload.todo,
+          merge: true
+      # ... etc
+
+
+# the Store is an instantiated Collection; a singleton.
 TodoStore = new TodoCollection()
-
 module.exports = TodoStore
 
 ```
 
 #### 2. Components *never* directly modify Stores (eg; no `.set()`). Instead, components dispatch Actions to the Dispatcher.
 
-```js
-// components/TodoComponent.js
-var React = require('react');
+```coffee
+# components/TodoComponent.coffee
+React = require("react")
 
-TodoListComponent = React.createClass({
-  // ...
-  handleTodoDelete: function() {
-    // instead of removing the todo from the TodoStore directly,
-    // we use the dispatcher. #flux
-    TodoDispatcher.dispatch({
-      actionType: 'todo-delete',
-      todo: this.props.todoItem
-    });
-  },
-  // ...
-});
+TodoListComponent = React.createClass
+  handleTodoDelete: ->
+    # instead of removing the todo from the TodoStore directly,
+    # we use the dispatcher. #flux
+    TodoDispatcher.dispatch
+      actionType: "todo-delete"
+      todo: @props.todoItem
+  # ... (see below) ...
 
-module.exports = TodoListComponent;
+module.exports = TodoListComponent
+
 ```
 
 #### 3. Components query Stores and bind to their events to trigger updates.
 
-```js
-// components/TodoComponent.js
-var React = require('react');
-// ...
+```coffee
+# components/TodoComponent.coffee
+React = require("react")
 
-TodoListComponent = React.createClass({
-  // ... 
-  componentDidMount: function() {
-    // the Component binds to the Store's events
-    this.props.todoStore.on('add remove reset', function(){
-      this.forceUpdate()
-    }.bind(this), this);
-  },
-  componentWillUnmount: function() {
-    // turn off all events and callbacks that have this context
-    this.props.todoStore.off(null, null, this);
-  },
-  // ...
-  render: function() {
-    return React.DOM.ul({},
-      this.props.todoStore.map(function(todoItem){
-        // TODO: TodoItemComponent, which would bind to 
-        // `this.props.todoItem.on('change')`
-        return TodoItemComponent({todoItem: todoItem});
-      })
-    )
-  }
-});
+TodoListComponent = React.createClass
+  handleTodoDelete: ->
+    # instead of removing the todo from the TodoStore directly,
+    # we use the dispatcher. #flux
+    TodoDispatcher.dispatch
+      actionType: "todo-delete"
+      todo: @props.todoItem
+  # ...
+  componentDidMount: ->
+    # the Component binds to the Store's events
+    @props.TodoStore.on "add remove reset", =>
+      @forceUpdate()
+    , @
+  componentWillUnmount: ->
+    # turn off all events and callbacks that have this context
+    @props.TodoStore.off null, null, this
+  render: ->
+    React.DOM.ul {},
+      @props.TodoStore.items.map (todoItem) ->
+        # TODO: TodoItemComponent, which would bind to
+        # `this.props.todoItem.on('change')`
+        TodoItemComponent {
+          todoItem: todoItem
+        }
+
+module.exports = TodoListComponent
+
 ```
-
-
 
 In fact, once I re-architected my application to use this pattern, almost all the ugly bits disappeared. It was a little miraculous: one by one, the pieces of code that had me gnashing my teeth looking for a better way were replaced by sensible flow. And the smoothness with which Backbone seems to integrate in this pattern is remarkable: I don't feel like I'm fighting Backbone, Flux, or React in order to fit them together. 
 
@@ -385,48 +378,49 @@ Writing the `this.on(...)` and `this.off(...)` code every time you add a FluxBon
 
 Here's an example React Mixin that, while extremely naiive, would certainly make iterating quickly even easier: 
 
-```js
-// in FluxBoneMixin.js
-module.exports = function(propName) {
-  return {
-    componentDidMount: function() {
-      this.props[propName].on('all', function(){
-        this.forceUpdate();
-      }.bind(this), this);
-    },
-    componentWillUnmount: function() {
-      this.props[propName].off('all', function(){
-        this.forceUpdate();
-      }.bind(this), this);
-    }
-  };
-};
+```coffee
+# in FluxBoneMixin.coffee
+module.exports = (propName) ->
+  componentDidMount: ->
+    @props[propName].on "all", =>
+      @forceUpdate()
+    , @
 
-// in MyComponent.js
-var React = require('react');
-var FluxBoneMixin = require('./FluxBoneMixin');
-var UserStore = require('./UserStore');
-var TodoStore = require('./TodoStore');
+  componentWillUnmount: ->
+    @props[propName].off "all", =>
+      @forceUpdate()
+    , @
 
-var MyComponent = React.createClass({
-  mixins: [FluxBoneMixin('UserStore'), FluxBoneMixin('TodoStore')],
-  render: function(){
-    return React.DOM.div({},
-      'Hello, ' + this.props.UserStore.get('name') +
-      ', you have ' + this.props.TodoStore.length + 
-      'things to do.'
-    )
-  }
-});
+```
+
+```coffee
+# in HelloComponent.coffee
+React = require("react")
+
+UserStore = require("./stores/UserStore")
+TodoStore = require("./stores/TodoStore")
+
+FluxBoneMixin = require("./FluxBoneMixin")
+
+
+MyComponent = React.createClass
+  mixins: [
+    FluxBoneMixin("UserStore"),
+    FluxBoneMixin("TodoStore"),
+  ]
+  render: ->
+    React.DOM.div {},
+      "Hello, #{ @props.UserStore.get('name') },
+      you have #{ @props.TodoStore.length }
+      things to do."
 
 React.renderComponent(
-  MyComponent({
-    MyStore: MyStore, 
+  MyComponent {
+    UserStore: UserStore
     TodoStore: TodoStore
-  }),
-  document.body.querySelector('.main')
-);
-
+  }
+  , document.body.querySelector(".main")
+)
 ```
 
 ### Syncing with a Web API
