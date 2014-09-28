@@ -1,13 +1,13 @@
 # Flux + Backbone = FluxBone
-## A practical introduction to using Backbone for Flux Stores
-
----
+## A proposal for using Backbone for Flux Stores
 
 [React.js](http://facebook.github.io/react/) is an incredible library. Sometimes it feels like the best thing since sliced Python. When the React devs [started talking about Flux](http://facebook.github.io/react/blog/2014/05/06/flux.html), an architecture that React fits into, I was excited, but a bit befuddled. After looking through their recent [docs](https://github.com/facebook/flux) and [examples](https://github.com/facebook/flux/blob/master/examples/flux-chat/js/stores/MessageStore.js), I realized there was still something missing with Flux "Stores". FluxBone is the pattern I use that fills the gaps I found, using Backbone's Models and Collections to underlie Stores. 
 
 The result has felt as simple and pleasant to use as React. 
 
-<<< ONE-SENTENCE SUMMARY OF THE TWO AND HOW THEY PLAY TOGETHER >>>
+In short, the recommended Flux architecture makes you to do too much legwork for Stores to be funcitonal. Backbone provides everything Stores are supposed to be able to do, so with a few specific patterns, we can just use that. In the future, Facebook may release a library they use for this internally, but until then, Backbone's bloat only totals 6.5kb minified/gzipped.
+
+I have used the pattern in two projects so far, one highly standard CRUD app, and one highly irregular, frontend-only application. I hope to open-source both and link them back here as examples. 
 
 ### A quick overview of Backbone, and it's shortcomings
 
@@ -17,7 +17,7 @@ In general, it was very nice, and the pieces fit together okay. Here's what Back
 
 #### Backbone 101
 
-(If you're already well-versed in Backbone, you can skip this - though your corrections would be valued!)
+(If you're already well-versed in Backbone, you can skip this).
 
 [Backbone](http://backbonejs.org) is an excellent ~little library that includes Views, Models, Collections, and Routes. Models are simple places to store data and optionally sync them with the server using a typical REST API. Collections are just places to store multiple model instances; think a SQL table. (React replaces Backbone's Views, and let's save Routes for another day.)
 
@@ -25,15 +25,12 @@ Both Models and Collections emit helpful events. For example, a model emits `"ch
 
 By including `model` and `url` attributes on a Collection, you get all the basic CRUD operations via a REST API for free, via `.save()`, `.fetch()`, and `.destroy()`. You can guess which does which. 
 
-... Now you know all the Backbone you need to know for FluxBone! But just to make it concrete, here's a quick example: 
+Here's a quick example: 
 
 ```js
 var Backbone = require('backbone');
 
-var TodoItem = Backbone.Model.extend({
-  // you don't actually need to put anything here.
-  // It's that easy!
-});
+var TodoItem = Backbone.Model.extend({});
 
 var TodoCollection = Backbone.Collection.extend({
   model: TodoItem,
@@ -68,13 +65,13 @@ itemTwo.destroy(); // sends `DELETE /todo/2`.
 
 Unfortunately, leaning on Backbone alone to handle the entire application flow outside of React's Views wasn't quite working for me. The "complex event chains" that I had [read about](http://www.code-experience.com/avoiding-event-chains-in-single-page-applications/) about didn't take long to rear their hydra-like heads. 
 
-Sending events from the UI to the Models, and then from one Model to another and then back again, just felt obviously wrong, especially after reading about Flux. My code, frankly, was gross. It took forever to find who was changing who, in what order, and why. 
+Sending events from the UI to the Models, and then from one Model to another and then back again, just felt obviously wrong, especially after reading about Flux. It took forever to find who was changing who, in what order, and why. 
 
 So I took another look at the mysterious "architecture-not-a-framework". 
 
 ### An Overview of Flux, and it's missing piece
 
-(If you're already well-versed in Flux, you can skip this - though your corrections would be valued!)
+(If you're already well-versed in Flux, you can skip this).
 
 Flux's slogan is "unidirectional data flow". Here's what that flow looks like: 
 
@@ -95,7 +92,7 @@ So Flux has three components:
 3. Stores (`EventEmitter = require('EventEmitter')`) 
   - (or, as we'll soon see, `Backbone = require('backbone')`)  
 
-#### React
+#### The Views
 
 I won't discuss React here, since so much has been written about it, other than to say that I vastly prefer it to Angular. I almost never feel *confused* when writing React code, unlike Angular. I've written and erased about twenty versions of "I love React it's great software really wow" so I'll just leave it at that. 
 
@@ -169,41 +166,24 @@ The Dispatcher also allows you to have callbacks run sequentially in a simple, s
 var MyDispatcher = require('./MyDispatcher');
 var MyStore = require('./MyStore');
 
-// this isn't actually how you're supposed to set up a store... 
-// but it gives you the right idea. 
+
 // We'll see the FluxBone way later. 
 MessageStore = {items: []}; 
 
 MessageStore.dispatchCallback = function(payload) {
   switch (payload.actionType) {
     case 'add-item': 
-      
-      // We only want to tell the user an item was added 
-      // once it's done being added to MyStore.
-      // yay synchronous event flow!
-      MyDispatcher.waitFor([MyStore.dispatchToken]);  // <------ the important line!
-      
-      // This will be displayed by the MessageComponent in React.
+
+      // synchronous event flow!
+      MyDispatcher.waitFor([MyStore.dispatchToken]);
+
       MessageStore.items.push('You added an item! It was: ' + payload.item); 
-      
-      // hide the message three seconds later.
-      // (tbh, I'm not sure how kosher this is...)
-      setTimeout(function(){
-        MyDispatcher.dispatch({
-          actionType: 'hide-message',
-        })
-      }, 3000);
-      break;
-    case 'hide-message': 
-      // delete first item in MessageStore.
-      MessageStore.items.shift(); 
-      break;
   }
 } 
 
 ```
 
-In practice, I was shocked to see how much cleaner my code was when using this approach to modify my Stores (err, Models & Collections), even without using `waitFor`.
+In practice, I was shocked to see how much cleaner my code was when using this approach to modify my Stores, even without using `waitFor`.
 
 #### Stores
 
@@ -221,9 +201,6 @@ var React = require('react');
 
 MyComponent = React.createClass({
   componentDidMount: function() {
-    // register a callback on MyStore
-    // to tell this component to forceUpdate
-    // whenever it triggers a "change" event.
     this.props.MyStore.addEventListener("change", function(){
       this.forceUpdate();
     }.bind(this));
@@ -337,9 +314,7 @@ TodoCollection = Backbone.Collection.extend({
   }.bind(this)
 });
 
-// the Store is an instantiated Collection. aka a singleton.
-// (if we were to only ever have one item, 
-//  it would be an instantiated Model instead).
+// the Store is an instantiated Collection; a singleton.
 TodoStore = new TodoCollection()
 
 module.exports = TodoStore
@@ -350,7 +325,6 @@ module.exports = TodoStore
 
 ```js
 // components/TodoComponent.js
-var actionCreator = require('../actions');
 var React = require('react');
 
 TodoListComponent = React.createClass({
@@ -401,13 +375,9 @@ TodoListComponent = React.createClass({
 });
 ```
 
-You can see that all put together in the `example.js` file in this gist. 
 
-This all fits together really smoothly, in my eyes. 
 
-In fact, once I re-architected my application to use this pattern, almost all the ugly bits disappeared. It was a little miraculous: one by one, the pieces of code that had me gnashing my teeth looking for a better way were replaced by sensible flow. 
-
-Note that I didn't even need to use `waitFor`; it may be *a* feature, but it's not the primary one. Just the general Flux architecture makes sense. I didn't really get how it was that different before using it. And the smoothness with which Backbone seems to integrate in this pattern is remarkable: not once did I feel like I was fighting Backbone, Flux, or React in order to fit them together. 
+In fact, once I re-architected my application to use this pattern, almost all the ugly bits disappeared. It was a little miraculous: one by one, the pieces of code that had me gnashing my teeth looking for a better way were replaced by sensible flow. And the smoothness with which Backbone seems to integrate in this pattern is remarkable: I don't feel like I'm fighting Backbone, Flux, or React in order to fit them together. 
 
 ### Example Mixin
 
@@ -439,7 +409,7 @@ var UserStore = require('./UserStore');
 var TodoStore = require('./TodoStore');
 
 var MyComponent = React.createClass({
-  mixins: [FluxBoneMixin('UserStore'), FluxBoneMixin('TodoStore')]
+  mixins: [FluxBoneMixin('UserStore'), FluxBoneMixin('TodoStore')],
   render: function(){
     return React.DOM.div({},
       'Hello, ' + this.props.UserStore.get('name') +
@@ -454,7 +424,7 @@ React.renderComponent(
     MyStore: MyStore, 
     TodoStore: TodoStore
   }),
-  document.querySelector('body')
+  document.body.querySelector('.main')
 );
 
 ```
@@ -463,17 +433,17 @@ React.renderComponent(
 
 In the original Flux diagram, you interact with the Web API through ActionCreators only. That never sat right with me; shouldn't the Store be the first to know about changes, before the server? 
 
-I flip that part of the diagram around: the Stores interact directly with a RESTful CRUD API through Backbone's `sync()`. This is wonderfully convenient, at least if you're working with an actual RESTful CRUD API. You can even tie into the `request` and `sync` events to easily display loading icons (kinda like [this](https://news.ycombinator.com/item?id=7721867)). 
+I flip that part of the diagram around: the Stores interact directly with a RESTful CRUD API through Backbone's `sync()`. This is wonderfully convenient, at least if you're working with an actual RESTful CRUD API. 
 
-For less standard tasks, interacting via ActionCreators may make more sense.  I suspect Facebook doesn't do much "mere CRUD", in which case it's not surprising they do things the officially recommended way. 
+This is great for data integrity. When you `.set()` a new property, the `change` event triggers a React re-render, optimistically displaying the new data. When you try to `.save()` it to the server, the `request` event lets you know to display a loading icon. When things go through, the `sync` event lets you know to remove the loading icon, or the `error` event lets you know to turn things red. You can see inspiration [here](https://news.ycombinator.com/item?id=7721867). 
 
-It may also be my youthful naivete that's causing me to interact with the web directly via Stores even for CRUD; I'm all ears to other explanations for the recommended Flux architecture, and why the above might not be a good idea. 
+There's also validation (and a corresponding `invalid` event) for a first layer of defense, and a `.fetch()` method to pull new information from the server. 
+
+For less standard tasks, interacting via ActionCreators may make more sense.  I suspect Facebook doesn't do much "mere CRUD", in which case it's not surprising they don't put Stores first. 
 
 ### Next Steps
 
 - React and Flux have been criticized for not including Routes. I'm hopeful that Backbone's Router, perhaps coupled with a FluxBone `CurrentPageStore`, will provide this. 
-
-- Writing the examples for this post in JavaScript was a reminder of how much I appreciate CoffeeScript. I've found Coffee and React/FluxBone get on swimmingly, and I hope to write something soon on how I pair them. 
 
 - Lastly, I'd love feedback on the above! Does this seem like a good pattern to you? Are there improvements or flaws you would suggest ammending?
   
