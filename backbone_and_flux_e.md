@@ -1,77 +1,27 @@
-# Flux + Backbone = FluxBone
-## A proposal for using Backbone for Flux Stores
+# Straightforward Databinding for React
+## Introducing FluxBone, a proposal for using Backbone for Flux Stores
 
-[React.js](http://facebook.github.io/react/) is an incredible library. Sometimes it feels like the best thing since sliced Python. When the React devs [started talking about Flux](http://facebook.github.io/react/blog/2014/05/06/flux.html), an architecture that React fits into, I was excited, but a bit befuddled. After looking through their recent [docs](https://github.com/facebook/flux) and [examples](https://github.com/facebook/flux/blob/master/examples/flux-chat/js/stores/MessageStore.js), I realized there was still something missing with Flux "Stores". FluxBone is the pattern I use that fills the gaps I found, using Backbone's Models and Collections to underlie Stores. 
+[React.js](http://facebook.github.io/react/) is an incredible library. Sometimes it feels like the best thing since sliced Python. React is only one part of a frontend application stack, however; it doesn't have much to say about how you should manage data and state. 
 
-The result has felt as simple and pleasant to use as React. 
+Facebook, the makers of React, have [offered some guidance](http://facebook.github.io/react/docs/flux-overview.html) there in the form of [Flux](https://github.com/facebook/flux). Flux is an "Application Architecture" (not a framework) built around one-way data flow, using React Views, an Action Dispatcher, and Stores. 
 
-In short, the recommended Flux architecture makes you to do too much legwork for Stores to be funcitonal. Backbone provides everything Stores are supposed to be able to do, so with a few specific patterns, we can just use that. In the future, Facebook may release a library they use for this internally, but until then, Backbone's bloat only totals 6.5kb minified/gzipped.
+The Flux pattern solves some major problems by embodying important principles of event control, which makes applications much easier to reason about (read: easier to maintain and develop). 
 
-I have used the pattern in two projects so far, one highly standard CRUD app, and one highly irregular, frontend-only application. I hope to open-source both and link them back here as examples. 
+Here, I'll introduce basic Flux control flow, discuss what's missing for Stores, and how to use Backbone Models and Collections to fill the gap in a "Flux-compliant" way. 
 
 (Note: the following examples are in CoffeeScript for convenience, and can be treated as pseudocode by non-CoffeeScript developers). 
 
-### A quick overview of Backbone, and it's shortcomings
+## Intro to Flux
 
-I started my journey by using React with Backbone's Models and Collections, without a Flux architecture. 
+### First, why do we need Flux? What's wrong with plain Backbone?
 
-In general, it was very nice, and the pieces fit together okay. Here's what Backbone does, and then what it did wrong:
+[Backbone](http://backbonejs.org) is an excellent ~little library that includes Views, Models, Collections, and Routes. It's the de facto standard library for structured frontend applications, and it's been paired with React since the latter was introduced. Most discussions of React outside of Facebook so far have have included mentiones of Backbone being used in tandem. 
 
-#### Backbone 101
+Unfortunately, leaning on Backbone alone to handle the entire application flow outside of React's Views presents unfortunate complications. The "complex event chains" that I had [read about](http://www.code-experience.com/avoiding-event-chains-in-single-page-applications/) about didn't take long to rear their hydra-like heads. Sending events from the UI to the Models, and then from one Model to another and then back again, makes it hard to find who was changing who, in what order, and why. 
 
-(If you're already well-versed in Backbone, you can skip this).
+The Flux pattern handles these problems with impressive ease and simplicity. 
 
-[Backbone](http://backbonejs.org) is an excellent ~little library that includes Views, Models, Collections, and Routes. Models are simple places to store data and optionally sync them with the server using a typical REST API. Collections are just places to store multiple model instances; think a SQL table. (React replaces Backbone's Views, and let's save Routes for another day.)
-
-Both Models and Collections emit helpful events. For example, a model emits `"change"` when it's been modified, a collection emits `"add"` when a new instance has been added, and they all emit `"request"` when you start to push a change to the server and `"sync"` once it's gone through.
-
-By including `model` and `url` attributes on a Collection, you get all the basic CRUD operations via a REST API for free, via `.save()`, `.fetch()`, and `.destroy()`. You can guess which does which. 
-
-Here's a quick example: 
-
-```coffee
-Backbone = require("backbone")
-
-TodoItem = Backbone.Model.extend({})
-
-TodoCollection = Backbone.Collection.extend(
-  model: TodoItem
-  url: "/todo"
-  initialize: ->
-    @fetch() # sends `GET /todo` and populates the models if there are any.
-)
-
-TodoList = new TodoCollection() # initialize() called. Let's assume no todos were returned.
-
-itemOne = new TodoItem(name: "buy milk")
-TodoList.add(itemOne) # this will send `POST /todo` with `name=buy milk`
-
-itemTwo = TodoList.create({name: "take out trash"}) # shortcut for above.
-
-TodoList.remove(itemOne) # sends `DELETE /todo/1`
-
-itemTwo.on "change", ->
-  console.log "itemTwo was changed!"
-
-itemTwo.on "sync", ->
-  console.log "itemTwo synced to server!"
-
-itemTwo.destroy() # sends `DELETE /todo/2`.
-# > itemTwo was changed!
-# > itemTwo synced to server!
-
-```
-
-
-#### Backbone's shortcomings
-
-Unfortunately, leaning on Backbone alone to handle the entire application flow outside of React's Views wasn't quite working for me. The "complex event chains" that I had [read about](http://www.code-experience.com/avoiding-event-chains-in-single-page-applications/) about didn't take long to rear their hydra-like heads. 
-
-Sending events from the UI to the Models, and then from one Model to another and then back again, just felt obviously wrong, especially after reading about Flux. It took forever to find who was changing who, in what order, and why. 
-
-So I took another look at the mysterious "architecture-not-a-framework". 
-
-### An Overview of Flux, and it's missing piece
+### An Overview of Flux
 
 (If you're already well-versed in Flux, you can skip this).
 
@@ -247,7 +197,7 @@ var MessageStore = merge(EventEmitter.prototype, {
 
 Gross! I have to write all that myself, every time I want a simple Store? Which I'm supposed to use every time I have a piece of information I want to display?? Do you think I have unlimited numbers of Facebook Engineers or something? (okay, I can think of *one* place that's true...) 
 
-### Flux Stores: the Missing Piece
+## Flux Stores: the Missing Piece
 
 Backbone's Models and Collections already have everything Flux's EventEmitter-based Stores seem to be doing. 
 
@@ -261,7 +211,7 @@ It's objectively less code (no need to duplicate work) and is subjectively more 
 
 So let's use Backbone for Stores! 
 
-### The FluxBone Pattern &copy; 
+## The FluxBone Pattern &copy;: Flux Stores by Backbone.
 
 1. Stores are instantiated Backbone Models or Collections, which have registered a callback with the Dispatcher. Typically, this means they are singletons. 
 2. Components *never* directly modify Stores (eg; no `.set()`). Instead, components dispatch Actions to the Dispatcher.
@@ -434,6 +384,10 @@ This is great for data integrity. When you `.set()` a new property, the `change`
 There's also validation (and a corresponding `invalid` event) for a first layer of defense, and a `.fetch()` method to pull new information from the server. 
 
 For less standard tasks, interacting via ActionCreators may make more sense.  I suspect Facebook doesn't do much "mere CRUD", in which case it's not surprising they don't put Stores first. 
+
+## Conclusion
+
+The Engineering teams at Facebook and Instagram have done remarkable work to push the frontend web forward with React, and the introduction of Flux gives a peek into a broader architecture that truly scales: not just in terms of technology, but engineering as well. Clever and careful use of Backbone can fill the gaps in Flux, making it amazingly easy for anyone from one-person indie shops to large companies to create and maintain impressive applications.
 
 ### Next Steps
 
